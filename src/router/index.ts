@@ -38,6 +38,16 @@ const router = createRouter({
       component: () => import('@/components/admin/Admin.vue'),
       children: [
         {
+          path: "user/insert",
+          name: "userInsert",
+          component: () => import('@/components/admin/UserInsert.vue'),
+        },
+        {
+          path: "user/update",
+          name: "userUpdate",
+          component: () => import('@/components/admin/UserUpdate.vue'),
+        },
+        {
           path: 'device/upload',
           name: 'admin-device-upload',
           component: () => import('@/components/admin/DataUpload.vue'),

@@ -77,7 +77,7 @@ const toggleCollapse = () => {
             </el-menu-item>
           </el-sub-menu>
 
-          <el-sub-menu index="/admin/post">
+          <!-- <el-sub-menu index="/admin/post">
             <template #title>
               <el-icon><Memo /></el-icon>
               <span>贴子管理</span>
@@ -90,15 +90,7 @@ const toggleCollapse = () => {
               <el-icon><List /></el-icon>
               <span>贴子列表</span>
             </el-menu-item>
-            <!--            <el-menu-item index="/admin/comment/audit">-->
-            <!--              <el-icon><DocumentChecked /></el-icon>-->
-            <!--              <span>评论审核</span>-->
-            <!--            </el-menu-item>-->
-            <!--            <el-menu-item index="/admin/comment/list">-->
-            <!--              <el-icon><List /></el-icon>-->
-            <!--              <span>评论列表</span>-->
-            <!--            </el-menu-item>-->
-          </el-sub-menu>
+          </el-sub-menu> -->
 
           <el-sub-menu index="/admin/device">
             <template #title>

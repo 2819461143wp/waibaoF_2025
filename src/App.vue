@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 </script>
 
-
 <!-- <template>
   <div id="app">
     <component :is="layoutComponent" />
