@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useRouter } from "vue-router";
-import { ref } from "vue";
+import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 import {
   User,
   Document,
@@ -11,14 +11,17 @@ import {
   DocumentChecked,
   Memo,
   List,
-} from "@element-plus/icons-vue";
-import { UserFilled, Edit, Upload } from "@element-plus/icons-vue";
-const router = useRouter();
-const isCollapse = ref(false);
+  Platform,
+  DocumentCopy,
+  PieChart,
+} from '@element-plus/icons-vue'
+import { UserFilled, Edit, Upload } from '@element-plus/icons-vue'
+const router = useRouter()
+const isCollapse = ref(false)
 
 const toggleCollapse = () => {
-  isCollapse.value = !isCollapse.value;
-};
+  isCollapse.value = !isCollapse.value
+}
 </script>
 
 <template>
@@ -35,11 +38,8 @@ const toggleCollapse = () => {
           <!-- Logo区域 -->
           <div class="logo-container">
             <img src="/src/assets/img/logo.png" alt="Logo" />
-            <h1
-              v-show="!isCollapse"
-              style="font-size: 16px; font-weight: 500; margin: 0"
-            >
-              大学生自驱成长平台<br />&nbsp;&nbsp;&nbsp;&nbsp;后台管理系统
+            <h1 v-show="!isCollapse" style="font-size: 16px; font-weight: 500; margin: 0">
+              工业智能数据分析平台
             </h1>
             <el-icon class="collapse-btn" @click="toggleCollapse">
               <Fold v-if="!isCollapse" />
@@ -52,9 +52,9 @@ const toggleCollapse = () => {
               <el-icon><HomeFilled /></el-icon>
               <span>仪表盘</span>
             </template>
-            <el-menu-item index="/admin/system/menus">
-              <el-icon><Document /></el-icon>
-              <span>菜单管理</span>
+            <el-menu-item index="/admin/system/analysis">
+              <el-icon><PieChart /></el-icon>
+              <span>数据看板</span>
             </el-menu-item>
             <el-menu-item index="/admin/system/roles">
               <el-icon><User /></el-icon>
@@ -94,24 +94,42 @@ const toggleCollapse = () => {
 
           <el-sub-menu index="/admin/device">
             <template #title>
-              <el-icon><Document /></el-icon>
+              <el-icon><List /></el-icon>
               <span>设备数据管理</span>
             </template>
             <el-menu-item index="/admin/device/dashboard">
               <el-icon><DataAnalysis /></el-icon>
               <span>数据总览</span>
             </el-menu-item>
-            <el-menu-item index="/admin/device/list">
-              <el-icon><List /></el-icon>
+            <!-- <el-menu-item index="/admin/device/list">
+              <el-icon><Document /></el-icon>
               <span>设备列表</span>
-            </el-menu-item>
+            </el-menu-item> -->
             <el-menu-item index="/admin/device/upload">
               <el-icon><Upload /></el-icon>
               <span>数据上传</span>
             </el-menu-item>
             <el-menu-item index="/admin/device/details">
-              <el-icon><Edit /></el-icon>
+              <el-icon><Document /></el-icon>
               <span>数据详情</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <el-sub-menu index="/admin/model">
+            <template #title>
+              <el-icon><Platform /></el-icon>
+              <span>智能分析</span>
+            </template>
+            <el-menu-item index="/admin/device/dashboard">
+              <el-icon><DocumentCopy /></el-icon>
+              <span>模型训练</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/device/list">
+              <el-icon><Document /></el-icon>
+              <span>故障预测</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/device/details">
+              <el-icon><Edit /></el-icon>
+              <span>建议生成</span>
             </el-menu-item>
           </el-sub-menu>
           <!--          <el-menu-item index="/admin/knowledge">-->

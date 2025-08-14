@@ -1,127 +1,128 @@
 <script setup>
-import { ref, computed } from "vue";
-import { ElMessage, ElLoading } from "element-plus";
-import { read, utils, writeFileXLSX } from "xlsx";
-import axios from "axios";
+import { ref, computed } from 'vue'
+import { ElMessage, ElLoading } from 'element-plus'
+import { read, utils, writeFileXLSX } from 'xlsx'
+import axios from 'axios'
 
-const importLoading = ref(false);
-const previewData = ref([]);
-const excelHeaders = ref([]);
-const rowErrors = ref({});
-const originalFile = ref(null);
+const importLoading = ref(false)
+const previewData = ref([])
+const excelHeaders = ref([])
+const rowErrors = ref({})
+const originalFile = ref(null)
 
-const SAMPLE_HEADERS = ["账号", "密码", "角色"];
+const SAMPLE_HEADERS = ['账号', '密码', '角色']
+
+const roleOptions = [
+  { label: 'user', value: 'user' },
+  { label: 'admin', value: 'admin' },
+]
 
 // 校验规则
 const validationRules = {
-  账号: (v) => !!v?.trim() || "账号不能为空",
-  密码: (v) => !!v?.trim() || "密码不能为空",
-  角色: (v) => !!v?.trim() || "角色不能为空",
-};
+  账号: (v) => !!v?.trim() || '账号不能为空',
+  密码: (v) => !!v?.trim() || '密码不能为空',
+  角色: (v) => !!v?.trim() || '角色不能为空',
+}
 
-const hasValidationErrors = computed(
-  () => Object.keys(rowErrors.value).length > 0,
-);
-const validationErrors = computed(() => Object.values(rowErrors.value).flat());
+const hasValidationErrors = computed(() => Object.keys(rowErrors.value).length > 0)
+const validationErrors = computed(() => Object.values(rowErrors.value).flat())
 
 const handleFileChange = async (uploadFile) => {
-  const loading = ElLoading.service({ lock: true });
+  const loading = ElLoading.service({ lock: true })
   try {
-    originalFile.value = uploadFile.raw;
-    const data = await uploadFile.raw.arrayBuffer();
-    const workbook = read(data);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    originalFile.value = uploadFile.raw
+    const data = await uploadFile.raw.arrayBuffer()
+    const workbook = read(data)
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
     const jsonData = utils.sheet_to_json(worksheet, {
       header: 1,
       raw: false,
-      defval: "",
-    });
+      defval: '',
+    })
 
     if (!arraysEqual(jsonData[0], SAMPLE_HEADERS)) {
-      ElMessage.error("文件列头与模板不一致");
-      previewData.value = [];
-      return;
+      ElMessage.error('文件列头与模板不一致')
+      previewData.value = []
+      return
     }
 
-    excelHeaders.value = jsonData[0];
+    excelHeaders.value = jsonData[0]
     previewData.value = jsonData.slice(1).map((row, index) => {
       const item = excelHeaders.value.reduce((obj, header, i) => {
-        obj[header] = (row[i] ?? "").toString().trim();
-        return obj;
-      }, {});
-      validateRow(item, index);
-      return item;
-    });
+        obj[header] = (row[i] ?? '').toString().trim()
+        return obj
+      }, {})
+      validateRow(item, index)
+      return item
+    })
   } catch (error) {
-    ElMessage.error(`文件解析失败: ${error.message}`);
+    ElMessage.error(`文件解析失败: ${error.message}`)
   } finally {
-    loading.close();
+    loading.close()
   }
-};
+}
 const handleImport = async () => {
-  importLoading.value = true;
+  importLoading.value = true
   try {
     if (!originalFile.value) {
-      ElMessage.error("请先选择文件");
-      return;
+      ElMessage.error('请先选择文件')
+      return
     }
 
     if (hasValidationErrors.value) {
-      ElMessage.error("请先修正数据错误");
-      return;
+      ElMessage.error('请先修正数据错误')
+      return
     }
 
-    const formData = new FormData();
-    formData.append("file", originalFile.value);
+    const formData = new FormData()
+    formData.append('file', originalFile.value)
 
-    const response = await axios.post("/api/user/upload", formData);
-    const { total, success, failed } = response.data;
+    const response = await axios.post('/api/user/upload', formData)
+    const { total, success, failed } = response.data
 
-    ElMessage.success(
-      `导入完成：共 ${total} 条数据，成功 ${success} 条，失败 ${failed} 条`,
-    );
+    ElMessage.success(`导入完成：共 ${total} 条数据，成功 ${success} 条，失败 ${failed} 条`)
 
     if (success > 0) {
-      previewData.value = [];
-      originalFile.value = null;
+      previewData.value = []
+      originalFile.value = null
     }
   } catch (error) {
-    console.error("导入失败详情:", error);
-    const msg = error.response?.data?.error || error.message;
-    ElMessage.error(`导入失败: ${msg}`);
+    console.error('导入失败详情:', error)
+    const msg = error.response?.data?.error || error.message
+    ElMessage.error(`导入失败: ${msg}`)
   } finally {
-    importLoading.value = false;
+    importLoading.value = false
   }
-};
+}
 
 const downloadTemplate = () => {
-  const workbook = utils.book_new();
-  const worksheet = utils.aoa_to_sheet([SAMPLE_HEADERS]);
-  utils.book_append_sheet(workbook, worksheet, "用户数据");
-  writeFileXLSX(workbook, "用户批量导入模板.xlsx");
-};
+  const workbook = utils.book_new()
+  const worksheet = utils.aoa_to_sheet([SAMPLE_HEADERS])
+  utils.book_append_sheet(workbook, worksheet, '用户数据')
+  writeFileXLSX(workbook, '用户批量导入模板.xlsx')
+}
 
 const arraysEqual = (a, b) => {
-  if (a?.length !== b?.length) return false;
-  return a.every((val, index) => val === b[index]);
-};
+  if (a?.length !== b?.length) return false
+  return a.every((val, index) => val === b[index])
+}
 
 const validateRow = (row, rowIndex) => {
-  const errors = [];
+  const errors = []
   excelHeaders.value.forEach((header) => {
-    const validator = validationRules[header];
+    const validator = validationRules[header]
     if (validator) {
-      const result = validator(row[header]);
-      if (result !== true) errors.push(result);
+      const result = validator(row[header])
+      if (result !== true) errors.push(result)
     }
-  });
+  })
 
   if (errors.length) {
-    rowErrors.value[rowIndex] = errors;
+    rowErrors.value[rowIndex] = errors
   } else {
-    delete rowErrors.value[rowIndex];
+    delete rowErrors.value[rowIndex]
   }
-};
+}
 </script>
 
 <template>
@@ -130,9 +131,7 @@ const validateRow = (row, rowIndex) => {
       <template #header>
         <div class="card-header">
           <span>用户批量导入 (账号/密码/角色)</span>
-          <el-button type="primary" link @click="downloadTemplate">
-            下载模板
-          </el-button>
+          <el-button type="primary" link @click="downloadTemplate"> 下载模板 </el-button>
         </div>
       </template>
 
@@ -143,9 +142,7 @@ const validateRow = (row, rowIndex) => {
         accept=".xlsx, .xls"
       >
         <template #trigger>
-          <el-button type="primary" :loading="importLoading">
-            选择 Excel 文件
-          </el-button>
+          <el-button type="primary" :loading="importLoading"> 选择 Excel 文件 </el-button>
         </template>
         <el-button
           type="success"
@@ -159,12 +156,7 @@ const validateRow = (row, rowIndex) => {
       </el-upload>
 
       <div v-if="previewData.length" class="mt-4">
-        <el-alert
-          v-if="hasValidationErrors"
-          type="error"
-          show-icon
-          class="mb-2"
-        >
+        <el-alert v-if="hasValidationErrors" type="error" show-icon class="mb-2">
           存在 {{ validationErrors.length }} 条数据校验错误，请修正后再提交！
         </el-alert>
 
@@ -176,7 +168,23 @@ const validateRow = (row, rowIndex) => {
             :label="header"
           >
             <template #default="{ row, $index }">
+              <template v-if="header === '角色'">
+                <el-select
+                  v-model="row[header]"
+                  @change="validateRow(row, $index)"
+                  :class="{ 'error-cell': rowErrors[$index]?.includes(header) }"
+                  placeholder="请选择角色"
+                >
+                  <el-option
+                    v-for="option in roleOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </el-select>
+              </template>
               <el-input
+                v-else
                 v-model="row[header]"
                 @change="validateRow(row, $index)"
                 :class="{ 'error-cell': rowErrors[$index]?.includes(header) }"

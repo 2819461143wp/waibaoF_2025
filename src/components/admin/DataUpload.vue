@@ -1,452 +1,584 @@
 <script setup>
-import { ref, computed } from "vue";
-import { ElMessage, ElLoading } from "element-plus";
-import { read, utils, writeFileXLSX, writeFile } from "xlsx";
-import axios from "axios";
-import { userStore } from "@/stores/user";
+import { ref, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
+import { userStore } from '@/stores/user'
 
-const store = userStore();
+const store = userStore()
 
 // 状态管理
-const importLoading = ref(false);
-const previewData = ref([]);
-const excelHeaders = ref([]);
-const rowErrors = ref({});
-const operator = ref(String(store.userId));
-const originalFile = ref(null);
-const fileName = ref("");
+const uploadLoading = ref(false)
+const selectedFiles = ref([])
+const selectedCategory = ref('')
+const selectedDataType = ref('')
 
-const SAMPLE_HEADERS = [
-  "timestamp",
-  "device_id",
-  "vibration",
-  "temperature",
-  "current",
-  "abnormal_type",
-];
-// 数值型字段校验
-const NUMBER_FIELDS = new Set(["vibration", "temperature", "current"]);
-
-// 校验规则
-const validationRules = {
-  timestamp: (v) => {
-    if (!v?.trim()) return "timestamp不能为空";
-    // 尝试匹配多种常见格式，或直接用Date.parse
-    if (isNaN(Date.parse(v))) return "请输入有效的日期时间格式";
-    return true;
+// 数据分类配置
+const dataCategories = {
+  production: {
+    label: '生产数据',
+    types: {
+      sensor: '传感器数据',
+      mes: 'MES生产记录',
+    },
   },
-  device_id: (v) => !!v?.trim() || "device_id不能为空",
-  abnormal_type: (v) => !!v?.trim() || "abnormal_type不能为空",
-  ...Array.from(NUMBER_FIELDS).reduce((acc, field) => {
-    acc[field] = (v) => {
-      if (!v && v !== 0) return true; // 允许空值
-      const num = Number(v);
-      if (isNaN(num)) return `${field}必须为数字`;
-      return true;
-    };
-    return acc;
-  }, {}),
-};
+  maintenance: {
+    label: '运维数据',
+    types: {
+      repair: '维修工单记录',
+      inspection: '设备点检日志',
+    },
+  },
+}
 
-// 计算属性
-const hasValidationErrors = computed(
-  () => Object.keys(rowErrors.value).length > 0,
-);
+// 计算属性：当前分类的数据类型选项
+const currentDataTypes = computed(() => {
+  if (!selectedCategory.value) return []
+  return Object.entries(dataCategories[selectedCategory.value].types).map(([key, label]) => ({
+    value: key,
+    label,
+  }))
+})
 
-const validationErrors = computed(() => Object.values(rowErrors.value).flat());
+// 重置数据类型选择
+const resetDataType = () => {
+  selectedDataType.value = ''
+}
 
-// CSV解析函数
-const parseCSV = (text) => {
-  const lines = text.split('\n').filter(line => line.trim());
-  return lines.map(line => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
+// 文件选择处理
+const handleFileChange = (uploadFile) => {
+  if (!selectedCategory.value || !selectedDataType.value) {
+    ElMessage.error('请先选择数据分类和类型')
+    return
+  }
+
+  // 检查文件是否已存在
+  const existingFile = selectedFiles.value.find((file) => file.originalName === uploadFile.raw.name)
+  if (existingFile) {
+    ElMessage.warning('该文件已选择')
+    return
+  }
+
+  const file = {
+    id: Date.now() + Math.random(),
+    file: uploadFile.raw,
+    originalName: uploadFile.raw.name,
+    displayName:
+      uploadFile.raw.name.substring(0, uploadFile.raw.name.lastIndexOf('.')) || uploadFile.raw.name,
+    size: uploadFile.raw.size,
+    category: selectedCategory.value,
+    dataType: selectedDataType.value,
+    isRenaming: false,
+  }
+
+  selectedFiles.value.push(file)
+  ElMessage.success('文件添加成功')
+}
+
+// 删除文件
+const removeFile = (fileId) => {
+  selectedFiles.value = selectedFiles.value.filter((file) => file.id !== fileId)
+}
+
+// 开始重命名
+const startRename = (file) => {
+  file.isRenaming = true
+  file.tempName = file.displayName
+}
+
+// 确认重命名
+const confirmRename = (file) => {
+  if (!file.tempName.trim()) {
+    ElMessage.error('文件名不能为空')
+    return
+  }
+  file.displayName = file.tempName.trim()
+  file.isRenaming = false
+  ElMessage.success('文件名修改成功')
+}
+
+// 取消重命名
+const cancelRename = (file) => {
+  file.isRenaming = false
+  delete file.tempName
+}
+
+// 获取文件扩展名
+const getFileExtension = (fileName) => {
+  return fileName.toLowerCase().split('.').pop()
+}
+
+// 获取最终文件名
+const getFinalFileName = (file) => {
+  const extension = getFileExtension(file.originalName)
+  return `${file.displayName}.${extension}`
+}
+
+// 批量上传文件
+const handleBatchUpload = async () => {
+  if (selectedFiles.value.length === 0) {
+    ElMessage.error('请先选择文件')
+    return
+  }
+
+  // 检查是否有文件正在重命名
+  const renamingFile = selectedFiles.value.find((file) => file.isRenaming)
+  if (renamingFile) {
+    ElMessage.error('请先完成文件重命名')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(`确定要上传 ${selectedFiles.value.length} 个文件吗？`, '确认上传', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+  } catch {
+    return
+  }
+
+  uploadLoading.value = true
+  let successCount = 0
+  let failCount = 0
+
+  try {
+    for (const fileItem of selectedFiles.value) {
+      try {
+        const formData = new FormData()
+
+        // 创建重命名后的文件
+        const finalFileName = getFinalFileName(fileItem)
+        const renamedFile = new File([fileItem.file], finalFileName, {
+          type: fileItem.file.type,
+        })
+
+        formData.append('file', renamedFile)
+        formData.append('operator', String(store.userId))
+        formData.append('category', fileItem.category)
+        formData.append('dataType', fileItem.dataType)
+
+        await axios.post('/api/device/data/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+
+        successCount++
+      } catch (error) {
+        console.error(`文件 ${fileItem.displayName} 上传失败:`, error)
+        failCount++
       }
     }
-    
-    result.push(current.trim());
-    return result;
-  });
-};
 
-// 文件处理
-const handleFileChange = async (uploadFile) => {
-  const loading = ElLoading.service({ lock: true });
-  try {
-    // 保存原始文件供后续上传使用
-    originalFile.value = uploadFile.raw;
-    // 基于原始文件名（去除扩展名）设置默认的上传文件名
-    const rawFileName = uploadFile.raw.name;
-    fileName.value = rawFileName.substring(0, rawFileName.lastIndexOf('.')) || rawFileName;
-
-    let jsonData;
-    const fileExtension = rawFileName.toLowerCase().split('.').pop();
-
-    if (fileExtension === 'csv') {
-      // 处理CSV文件
-      const text = await uploadFile.raw.text();
-      jsonData = parseCSV(text);
-    } else {
-      // 处理Excel文件
-      const data = await uploadFile.raw.arrayBuffer();
-      const workbook = read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      jsonData = utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        defval: "",
-      });
+    if (successCount > 0) {
+      ElMessage.success(`成功上传 ${successCount} 个文件`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`${failCount} 个文件上传失败`)
     }
 
-    // 表头校验
-    if (!arraysEqual(jsonData[0], SAMPLE_HEADERS)) {
-      ElMessage.error("文件列头与模板不一致");
-      previewData.value = [];
-      return;
+    // 如果全部成功，清空文件列表
+    if (failCount === 0) {
+      handleReset()
     }
-
-    excelHeaders.value = jsonData[0];
-    previewData.value = jsonData.slice(1).map((row, index) => {
-      const item = excelHeaders.value.reduce((obj, header, i) => {
-        obj[header] = (row[i] ?? "").toString().trim();
-        return obj;
-      }, {});
-      validateRow(item, index);
-      return item;
-    });
   } catch (error) {
-    ElMessage.error(`文件解析失败: ${error.message}`);
+    console.error('批量上传失败:', error)
+    ElMessage.error('批量上传失败')
   } finally {
-    loading.close();
+    uploadLoading.value = false
   }
-};
+}
 
-// 提交导入
-const handleImport = async () => {
-  importLoading.value = true;
-  try {
-    if (!originalFile.value) {
-      ElMessage.error("请先选择文件");
-      return;
-    }
+// 重置所有状态
+const handleReset = () => {
+  selectedFiles.value = []
+  selectedCategory.value = ''
+  selectedDataType.value = ''
+}
 
-    if (hasValidationErrors.value) {
-      ElMessage.error("请先修正数据错误");
-      return;
-    }
-
-    const formData = new FormData();
-    // 使用用户指定的文件名，如果为空则使用原始文件名
-    const originalExtension = originalFile.value.name.toLowerCase().split('.').pop();
-    const finalFileName = fileName.value.trim() 
-      ? `${fileName.value.trim()}.${originalExtension}` 
-      : originalFile.value.name;
-    const renamedFile = new File([originalFile.value], finalFileName, { type: originalFile.value.type });
-
-    formData.append("file", renamedFile);
-    formData.append("operator", operator.value || String(store.userId));
-
-    const response = await axios.post("/api/device/data/upload", formData);
-    ElMessage.success(`成功导入 ${response.data.count} 条数据`);
-    previewData.value = [];
-    originalFile.value = null;
-  } catch (error) {
-    console.error("导入失败详情:", error);
-    const msg = error.response?.data?.error || error.message;
-    ElMessage.error(`导入失败: ${msg}`);
-  } finally {
-    importLoading.value = false;
-  }
-};
-
-// 辅助方法：严格比较数组
-const arraysEqual = (a, b) => {
-  if (a?.length !== b?.length) return false;
-  return a.every((val, index) => val === b[index]);
-};
-
-// 修改后的校验方法
-const validateRow = (row, rowIndex) => {
-  const errors = [];
-  // 遍历所有字段
-  excelHeaders.value.forEach((header) => {
-    const validator = validationRules[header];
-    if (validator) {
-      const result = validator(row[header]);
-      if (result !== true) errors.push(result);
-    }
-  });
-
-  // 检查是否存在额外字段
-  const extraFields = Object.keys(row).filter(
-    (key) => !excelHeaders.value.includes(key),
-  );
-  if (extraFields.length) {
-    errors.push(`存在额外字段：${extraFields.join(", ")}`);
-  }
-
-  if (errors.length) {
-    rowErrors.value[rowIndex] = errors;
-  } else {
-    delete rowErrors.value[rowIndex];
-  }
-};
-
-// 下载Excel模板
-const downloadExcelTemplate = () => {
-  const workbook = utils.book_new();
-  const worksheet = utils.aoa_to_sheet([SAMPLE_HEADERS]);
-  utils.book_append_sheet(workbook, worksheet, "生产数据");
-  writeFileXLSX(workbook, "生产数据模板.xlsx");
-};
-
-// 下载CSV模板
-const downloadCSVTemplate = () => {
-  const csvContent = SAMPLE_HEADERS.join(',');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', '生产数据模板.csv');
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-// 导出当前数据为Excel
-const exportCurrentDataAsExcel = () => {
-  if (previewData.value.length === 0) {
-    ElMessage.warning("没有数据可导出");
-    return;
-  }
-  
-  const workbook = utils.book_new();
-  const data = [excelHeaders.value, ...previewData.value.map(row => 
-    excelHeaders.value.map(header => row[header] || '')
-  )];
-  const worksheet = utils.aoa_to_sheet(data);
-  utils.book_append_sheet(workbook, worksheet, "生产数据");
-  writeFileXLSX(workbook, `${fileName.value || '导出数据'}.xlsx`);
-};
-
-// 导出当前数据为CSV
-const exportCurrentDataAsCSV = () => {
-  if (previewData.value.length === 0) {
-    ElMessage.warning("没有数据可导出");
-    return;
-  }
-  
-  const csvRows = [excelHeaders.value];
-  previewData.value.forEach(row => {
-    csvRows.push(excelHeaders.value.map(header => {
-      const value = row[header] || '';
-      // 如果值包含逗号、引号或换行符，需要用引号包围并转义
-      if (value.toString().includes(',') || value.toString().includes('"') || value.toString().includes('\n')) {
-        return `"${value.toString().replace(/"/g, '""')}"`;
-      }
-      return value;
-    }));
-  });
-  
-  const csvContent = csvRows.map(row => row.join(',')).join('\n');
-  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `${fileName.value || '导出数据'}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+// 清空文件列表
+const clearAllFiles = () => {
+  selectedFiles.value = []
+}
 </script>
 
 <template>
-  <div class="excel-import-export">
-    <el-card shadow="hover" class="flex-card">
+  <div class="file-upload">
+    <el-card shadow="hover" class="upload-card">
       <template #header>
         <div class="card-header">
-          <span>生产设备信息导入</span>
-          <div class="header-actions">
-            <el-button-group>
-              <el-button type="primary" link @click="downloadExcelTemplate">
-                下载Excel模板
-              </el-button>
-              <el-button type="primary" link @click="downloadCSVTemplate">
-                下载CSV模板
-              </el-button>
-            </el-button-group>
-          </div>
+          <span>生产设备数据上传</span>
+          <el-button
+            v-if="selectedFiles.length > 0"
+            type="danger"
+            size="small"
+            @click="clearAllFiles"
+          >
+            清空全部
+          </el-button>
         </div>
       </template>
 
-      <el-upload
-        :auto-upload="false"
-        :show-file-list="false"
-        :on-change="handleFileChange"
-        accept=".xlsx,.xls,.csv"
-      >
-        <template #trigger>
-          <el-button type="primary" :loading="importLoading">
-            选择文件 (Excel/CSV)
-          </el-button>
-        </template>
+      <div class="upload-content">
+        <!-- 数据分类选择 -->
+        <div class="category-section">
+          <el-card shadow="never" class="category-card">
+            <div class="category-header">
+              <span class="section-title">数据分类选择</span>
+            </div>
 
-        <el-button
-          type="success"
-          :disabled="!previewData.length || hasValidationErrors"
-          @click="handleImport"
-          :loading="importLoading"
-          class="ml-2"
-        >
-          确认导入
-        </el-button>
+            <el-form :model="{ selectedCategory, selectedDataType }" label-width="120px">
+              <el-form-item label="数据大类：" required>
+                <el-radio-group v-model="selectedCategory" @change="resetDataType">
+                  <el-radio v-for="(category, key) in dataCategories" :key="key" :value="key">
+                    {{ category.label }}
+                  </el-radio>
+                </el-radio-group>
+              </el-form-item>
 
-        <el-input
-          v-model="fileName"
-          placeholder="请输入上传文件名（可选）"
-          class="ml-2"
-          style="width: 220px"
-        />
-      </el-upload>
-
-      <!-- 导出按钮组 -->
-      <div v-if="previewData.length" class="export-actions mt-2">
-        <span class="export-label">导出当前数据：</span>
-        <el-button-group>
-          <el-button type="info" size="small" @click="exportCurrentDataAsExcel">
-            导出Excel
-          </el-button>
-          <el-button type="info" size="small" @click="exportCurrentDataAsCSV">
-            导出CSV
-          </el-button>
-        </el-button-group>
-      </div>
-
-      <!-- 数据预览 & 编辑 -->
-      <div v-if="previewData.length" class="mt-4">
-        <el-alert
-          v-if="hasValidationErrors"
-          type="error"
-          show-icon
-          class="mb-2"
-        >
-          存在 {{ validationErrors.length }} 条数据校验错误，请修正后再提交！
-        </el-alert>
-
-        <el-table :data="previewData" border height="900px">
-          <el-table-column
-            v-for="(header, index) in excelHeaders"
-            :key="index"
-            :prop="header"
-            :label="header"
-          >
-            <template #default="{ row, $index }">
-              <el-input
-                v-model="row[header]"
-                @change="validateRow(row, $index)"
-                :class="{ 'error-cell': rowErrors[$index]?.includes(header) }"
-              />
-            </template>
-          </el-table-column>
-
-          <el-table-column label="错误信息" width="200">
-            <template #default="{ $index }">
-              <div v-if="rowErrors[$index]" class="error-messages">
-                <el-tag
-                  v-for="(error, i) in rowErrors[$index]"
-                  :key="i"
-                  type="danger"
-                  size="small"
+              <el-form-item label="具体类型：" required>
+                <el-select
+                  v-model="selectedDataType"
+                  placeholder="请先选择数据大类"
+                  :disabled="!selectedCategory"
+                  style="width: 200px"
                 >
-                  {{ error }}
-                </el-tag>
+                  <el-option
+                    v-for="type in currentDataTypes"
+                    :key="type.value"
+                    :label="type.label"
+                    :value="type.value"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </el-card>
+        </div>
+
+        <!-- 文件上传区域 -->
+        <div class="upload-section">
+          <el-upload
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handleFileChange"
+            accept=".xlsx,.xls,.csv"
+            :disabled="!selectedCategory || !selectedDataType"
+            multiple
+            drag
+          >
+            <div class="upload-dragger">
+              <el-icon class="upload-icon"><upload-filled /></el-icon>
+              <div class="upload-text">
+                <p v-if="!selectedCategory || !selectedDataType">请先选择数据分类和类型</p>
+                <template v-else>
+                  <p>将文件拖拽到此处，或<em>点击上传</em></p>
+                  <p class="upload-tip">支持 Excel (.xlsx, .xls) 和 CSV 格式，可多选</p>
+                  <p class="upload-category">
+                    当前分类：{{ dataCategories[selectedCategory]?.label }} -
+                    {{ dataCategories[selectedCategory]?.types[selectedDataType] }}
+                  </p>
+                </template>
               </div>
-            </template>
-          </el-table-column>
-        </el-table>
+            </div>
+          </el-upload>
+        </div>
+
+        <!-- 文件列表 -->
+        <div v-if="selectedFiles.length > 0" class="file-list-section">
+          <el-divider content-position="left"> 已选择文件 ({{ selectedFiles.length }}) </el-divider>
+
+          <div class="file-list">
+            <div v-for="file in selectedFiles" :key="file.id" class="file-item">
+              <div class="file-info">
+                <el-icon class="file-icon"><document /></el-icon>
+
+                <!-- 文件名显示/编辑 -->
+                <div class="file-name-section">
+                  <div v-if="!file.isRenaming" class="file-name-display">
+                    <span class="file-name" @dblclick="startRename(file)" :title="'双击修改文件名'">
+                      {{ getFinalFileName(file) }}
+                    </span>
+                    <el-tag size="small" type="info">
+                      {{ dataCategories[file.category]?.label }} -
+                      {{ dataCategories[file.category]?.types[file.dataType] }}
+                    </el-tag>
+                  </div>
+
+                  <div v-else class="file-name-edit">
+                    <el-input
+                      v-model="file.tempName"
+                      size="small"
+                      style="width: 200px"
+                      @keyup.enter="confirmRename(file)"
+                      @keyup.esc="cancelRename(file)"
+                      ref="renameInput"
+                    />
+                    <span class="file-extension">.{{ getFileExtension(file.originalName) }}</span>
+                    <el-button size="small" type="primary" @click="confirmRename(file)">
+                      确定
+                    </el-button>
+                    <el-button size="small" @click="cancelRename(file)"> 取消 </el-button>
+                  </div>
+                </div>
+
+                <div class="file-meta">
+                  <span class="file-size">{{ (file.size / 1024 / 1024).toFixed(2) }} MB</span>
+                </div>
+              </div>
+
+              <div class="file-actions">
+                <el-button
+                  v-if="!file.isRenaming"
+                  size="small"
+                  type="primary"
+                  text
+                  @click="startRename(file)"
+                >
+                  重命名
+                </el-button>
+                <el-button size="small" type="danger" text @click="removeFile(file.id)">
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="action-section">
+          <el-button
+            type="primary"
+            size="large"
+            :loading="uploadLoading"
+            :disabled="selectedFiles.length === 0"
+            @click="handleBatchUpload"
+          >
+            <el-icon><upload /></el-icon>
+            批量上传 ({{ selectedFiles.length }})
+          </el-button>
+
+          <el-button
+            v-if="selectedFiles.length > 0 || selectedCategory || selectedDataType"
+            size="large"
+            @click="handleReset"
+          >
+            重置全部
+          </el-button>
+        </div>
       </div>
     </el-card>
   </div>
 </template>
 
 <style scoped>
+.file-upload {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-card {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+}
+
+:deep(.upload-card .el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.header-actions {
+.upload-content {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
 }
 
-.export-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* 分类选择区域 */
+.category-section {
+  margin-bottom: 16px;
 }
 
-.export-label {
-  font-size: 14px;
+.category-card {
+  background: #f8f9fa;
+}
+
+.category-header {
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-weight: 600;
+  color: #303133;
+  font-size: 16px;
+}
+
+/* 上传区域 */
+.upload-section {
+  margin-bottom: 8px;
+}
+
+.upload-dragger {
+  padding: 15px;
+  text-align: center;
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+  transition: border-color 0.3s;
+}
+
+.upload-dragger:hover {
+  border-color: #409eff;
+}
+
+.upload-icon {
+  font-size: 40px;
+  color: #c0c4cc;
+  margin-bottom: 16px;
+}
+
+.upload-text p {
+  margin: 4px 0;
   color: #606266;
 }
 
-.left-actions {
+.upload-text em {
+  color: #409eff;
+  font-style: normal;
+}
+
+.upload-tip {
+  font-size: 10px;
+  color: #909399;
+}
+
+.upload-category {
+  font-size: 13px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+/* 文件列表 */
+.file-list-section {
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.file-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.file-icon {
+  font-size: 20px;
+  color: #409eff;
+}
+
+.file-name-section {
+  flex: 1;
+}
+
+.file-name-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #303133;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.file-name:hover {
+  background-color: #f0f9ff;
+  color: #409eff;
+}
+
+.file-name-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-extension {
+  color: #909399;
+  font-size: 14px;
+}
+
+.file-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-size {
+  color: #909399;
+  font-size: 12px;
+}
+
+.file-actions {
   display: flex;
   gap: 8px;
 }
 
-.error-cell :deep(.el-input__inner) {
-  border-color: #ff4d4f !important;
-  background-color: #fff2f0 !important;
-}
-
-.error-messages {
+/* 操作按钮区域 */
+.action-section {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.excel-import-export {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  justify-content: center;
   gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 
-.flex-card {
-  flex: 1;
-  display: flex !important;
-  flex-direction: column;
-  min-height: 0;
+/* Element Plus 样式覆盖 */
+:deep(.el-upload-dragger) {
+  width: 100%;
+  border: none;
+  background: transparent;
 }
 
-:deep(.flex-card .el-card__body) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  overflow: hidden;
+:deep(.el-upload-dragger:hover) {
+  background: transparent;
 }
 
-:deep(.el-table) {
-  flex: 1;
-  margin-bottom: 16px;
+:deep(.el-radio-group .el-radio) {
+  margin-right: 24px;
 }
 </style>

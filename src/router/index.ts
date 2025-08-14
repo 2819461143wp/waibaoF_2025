@@ -38,6 +38,11 @@ const router = createRouter({
       component: () => import('@/components/admin/Admin.vue'),
       children: [
         {
+          path: "system/analysis",
+          name: "systemAnalysis",
+          component: () => import('@/components/admin/SystemAnalysis.vue'),
+        },
+        {
           path: "user/insert",
           name: "userInsert",
           component: () => import('@/components/admin/UserInsert.vue'),
