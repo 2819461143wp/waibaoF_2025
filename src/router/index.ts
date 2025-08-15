@@ -38,24 +38,34 @@ const router = createRouter({
       component: () => import('@/components/admin/Admin.vue'),
       children: [
         {
-          path: "system/analysis",
-          name: "systemAnalysis",
+          path: 'system/analysis',
+          name: 'systemAnalysis',
           component: () => import('@/components/admin/SystemAnalysis.vue'),
         },
         {
-          path: "user/insert",
-          name: "userInsert",
+          path: 'user/insert',
+          name: 'userInsert',
           component: () => import('@/components/admin/UserInsert.vue'),
         },
         {
-          path: "user/update",
-          name: "userUpdate",
+          path: 'user/update',
+          name: 'userUpdate',
           component: () => import('@/components/admin/UserUpdate.vue'),
         },
         {
           path: 'device/upload',
           name: 'admin-device-upload',
           component: () => import('@/components/admin/DataUpload.vue'),
+        },
+        {
+          path: 'model/train',
+          name: 'modelTrain',
+          component: () => import('@/components/admin/ModelTrain.vue'),
+        },
+        {
+          path: 'model/predict',
+          name: 'modelPredict',
+          component: () => import('@/components/admin/ModelPredict.vue'),
         },
       ],
     },

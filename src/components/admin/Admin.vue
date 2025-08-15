@@ -119,11 +119,11 @@ const toggleCollapse = () => {
               <el-icon><Platform /></el-icon>
               <span>智能分析</span>
             </template>
-            <el-menu-item index="/admin/device/dashboard">
+            <el-menu-item index="/admin/model/train">
               <el-icon><DocumentCopy /></el-icon>
               <span>模型训练</span>
             </el-menu-item>
-            <el-menu-item index="/admin/device/list">
+            <el-menu-item index="/admin/model/predict">
               <el-icon><Document /></el-icon>
               <span>故障预测</span>
             </el-menu-item>
