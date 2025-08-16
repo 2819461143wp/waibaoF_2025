@@ -127,7 +127,7 @@ const toggleCollapse = () => {
               <el-icon><Document /></el-icon>
               <span>故障预测</span>
             </el-menu-item>
-            <el-menu-item index="/admin/device/details">
+            <el-menu-item index="/admin/model/advice">
               <el-icon><Edit /></el-icon>
               <span>建议生成</span>
             </el-menu-item>

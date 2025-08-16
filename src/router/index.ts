@@ -67,6 +67,11 @@ const router = createRouter({
           name: 'modelPredict',
           component: () => import('@/components/admin/ModelPredict.vue'),
         },
+        {
+          path: "model/advice",
+          name: "modelAdvice",
+          component: () => import('@/components/admin/ModelAdvice.vue'),
+        }
       ],
     },
     {
