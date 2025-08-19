@@ -3,7 +3,7 @@
     <el-card class="predict-card">
       <template #header>
         <div class="card-header">
-          <span>模型预测向导</span>
+          <span>故障预测</span>
         </div>
       </template>
 

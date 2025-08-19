@@ -3,7 +3,7 @@
     <el-card class="train-card">
       <template #header>
         <div class="card-header">
-          <span>模型训练向导</span>
+          <span>模型训练</span>
         </div>
       </template>
 
