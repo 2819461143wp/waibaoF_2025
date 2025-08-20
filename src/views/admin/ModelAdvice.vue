@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <template #header>
-      <span>示例数据集 → 故障能耗优化建议</span>
+      <span>示例数据集 → 设备能耗优化建议</span>
     </template>
 
     <!-- 1. 选择数据集 -->

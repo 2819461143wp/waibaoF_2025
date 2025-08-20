@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,77 +6,84 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView,
-    },
-    {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
+      component: () => import('@/views/Home.vue'),
     },
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/components/Login.vue'),
+      component: () => import('@/views/Login.vue'),
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('@/components/Register.vue'),
-    },
-    {
-      path: '/layout',
-      name: 'layout',
-      component: () => import('@/components/layout/layout.vue'),
+      component: () => import('@/views/Register.vue'),
     },
     {
       path: '/admin',
       name: 'admin',
-      component: () => import('@/components/admin/Admin.vue'),
+      component: () => import('@/views/admin/Admin.vue'),
       children: [
         {
           path: 'system/analysis',
           name: 'systemAnalysis',
-          component: () => import('@/components/admin/SystemAnalysis.vue'),
+          component: () => import('@/views/admin/SystemAnalysis.vue'),
+        },
+        {
+          path: 'system/role',
+          name: 'systemRole',
+          component: () => import('@/views/admin/SystemRole.vue'),
         },
         {
           path: 'user/insert',
           name: 'userInsert',
-          component: () => import('@/components/admin/UserInsert.vue'),
+          component: () => import('@/views/admin/UserInsert.vue'),
         },
         {
           path: 'user/update',
           name: 'userUpdate',
-          component: () => import('@/components/admin/UserUpdate.vue'),
+          component: () => import('@/views/admin/UserUpdate.vue'),
         },
         {
           path: 'device/upload',
           name: 'admin-device-upload',
-          component: () => import('@/components/admin/DataUpload.vue'),
+          component: () => import('@/views/admin/DataUpload.vue'),
         },
         {
           path: 'model/train',
           name: 'modelTrain',
-          component: () => import('@/components/admin/ModelTrain.vue'),
+          component: () => import('@/views/admin/ModelTrain.vue'),
         },
         {
           path: 'model/predict',
           name: 'modelPredict',
-          component: () => import('@/components/admin/ModelPredict.vue'),
+          component: () => import('@/views/admin/ModelPredict.vue'),
         },
         {
-          path: "model/advice",
-          name: "modelAdvice",
-          component: () => import('@/components/admin/ModelAdvice.vue'),
-        }
+          path: 'model/advice',
+          name: 'modelAdvice',
+          component: () => import('@/views/admin/ModelAdvice.vue'),
+        },
+        {
+          path: 'equip/order',
+          name: 'equipOrder',
+          component: () => import('@/views/admin/EquipOrder.vue'),
+        },
+        {
+          path: 'equip/process',
+          name: 'equipProcess',
+          component: () => import('@/views/admin/EquipProcess.vue'),
+        },
+        {
+          path: 'equip/list',
+          name: 'equipList',
+          component: () => import('@/views/admin/EquipList.vue'),
+        },
       ],
     },
     {
       path: '/home',
       name: 'home',
-      component: () => import('@/components/Home.vue'),
+      component: () => import('@/views/Home.vue'),
     },
   ],
 })

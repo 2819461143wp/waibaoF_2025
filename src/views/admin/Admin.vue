@@ -1,21 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
-import {
-  User,
-  Document,
-  Fold,
-  Expand,
-  HomeFilled,
-  DataAnalysis,
-  DocumentChecked,
-  Memo,
-  List,
-  Platform,
-  DocumentCopy,
-  PieChart,
-} from '@element-plus/icons-vue'
-import { UserFilled, Edit, Upload } from '@element-plus/icons-vue'
 const router = useRouter()
 const isCollapse = ref(false)
 
@@ -56,7 +41,7 @@ const toggleCollapse = () => {
               <el-icon><PieChart /></el-icon>
               <span>数据看板</span>
             </el-menu-item>
-            <el-menu-item index="/admin/system/roles">
+            <el-menu-item index="/admin/system/role">
               <el-icon><User /></el-icon>
               <span>角色管理</span>
             </el-menu-item>
@@ -132,10 +117,24 @@ const toggleCollapse = () => {
               <span>建议生成</span>
             </el-menu-item>
           </el-sub-menu>
-          <!--          <el-menu-item index="/admin/knowledge">-->
-          <!--            <el-icon><MessageBox /></el-icon>-->
-          <!--            <span>知识库管理</span>-->
-          <!--          </el-menu-item>-->
+          <el-sub-menu index="/admin/equip">
+            <template #title>
+              <el-icon><BellFilled /></el-icon>
+              <span>设备生命周期管理</span>
+            </template>
+            <el-menu-item index="/admin/equip/order">
+              <el-icon><Position /></el-icon>
+              <span>指令下达</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/equip/process">
+              <el-icon><DocumentChecked /></el-icon>
+              <span>工单上报</span>
+            </el-menu-item>
+            <el-menu-item index="/admin/equip/list">
+              <el-icon><Memo /></el-icon>
+              <span>工单总览</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </el-aside>
     </div>
